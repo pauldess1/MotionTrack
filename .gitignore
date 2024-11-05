@@ -24,7 +24,9 @@ var/
 .installed.cfg
 *.egg
 *.mp4
-*jpg
+*.jpg
+*.jpeg
+
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -95,3 +97,4 @@ ENV/
 deep_sort/resources/
 deep_sort/networks/
 deep_sort/networks-20241105T104716Z-001/
+detect/weights

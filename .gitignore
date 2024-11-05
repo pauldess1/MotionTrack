@@ -23,6 +23,8 @@ var/
 *.egg-info/
 .installed.cfg
 *.egg
+*.mp4
+*jpg
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -90,7 +92,6 @@ ENV/
 # Rope project settings
 .ropeproject
 
-videos/
 deep_sort/resources/
 deep_sort/networks/
 deep_sort/networks-20241105T104716Z-001/

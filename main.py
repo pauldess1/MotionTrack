@@ -1,26 +1,66 @@
-from utils.video2image import convertVideo2Images
-from detect.detection import run_detection
-from deep_sort.deep_sort_app import run 
-import os
+import cv2
+from deep_sort_realtime.deepsort_tracker import DeepSort
+from ultralytics import YOLO
+import torch
 
-import os
+# Initialize the YOLO model for detection
+model = YOLO("weights/yolo11m.pt")
 
-def main(video_path, detect_output_file):
-    temp = 'temp_files'
-    frames_file = os.path.join(temp, 'frames')
-    detections_file = os.path.join(temp, 'detections.npy')
-    os.makedirs(frames_file, exist_ok=True)
-    os.makedirs(temp, exist_ok=True)
+# Initialize DeepSort tracker
+tracker = DeepSort(max_age=10)
 
-    convertVideo2Images(video_path, frames_file)
-    run_detection(frames_file, detections_file)
+def main_live():
+    cap = cv2.VideoCapture(0)
 
-    if os.path.exists(detections_file):
-        run(frames_file, detections_file, detect_output_file, 
-            min_confidence=0.8, nms_max_overlap=1, 
-            min_detection_height=0, max_cosine_distance=0.2, 
-            nn_budget=None, display=True)
-    else:
-        print(f"Le fichier de détections n'a pas été trouvé : {detections_file}")
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
 
-main('videos/running.mp4', 'detections_output.npy')
+        results = model(frame)
+        results = results[0]
+        boxes = results.boxes
+
+        bbs = []
+        for box in boxes:
+            x_center, y_center, width, height = box.xywh[0].cpu().numpy()
+            confidence = box.conf[0].cpu().numpy()
+            class_id = box.cls[0].cpu().numpy()
+
+            if confidence < 0.3:
+                continue
+
+            left, top = int(x_center - width / 2), int(y_center - height / 2)
+            right, bottom = int(x_center + width / 2), int(y_center + height / 2)
+            width, height = int(width), int(height)
+
+            bbs.append(([left, top, width, height], float(confidence), str(int(class_id))))
+
+        embeds = []
+        print(f'bbs : {bbs}')
+        tracks = tracker.update_tracks(bbs, frame=frame)
+        print(f'tracks : {tracks}')
+
+        for track in tracks:
+            if not track.is_confirmed():
+                continue
+            
+            track_id = track.track_id
+            left, top, right, bottom = track.to_ltrb()
+
+            left, top, right, bottom = map(int, [left, top, right, bottom])
+            
+            cv2.rectangle(frame, (left, top), (right, bottom), (0, 255, 0), 2)
+            cv2.putText(frame, f"ID: {track_id}", (left, top - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+        cv2.imshow('Tracked Objects', frame)
+
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
+    cap.release()
+    cv2.destroyAllWindows()
+
+
+if __name__ == "__main__":
+    main_live()
